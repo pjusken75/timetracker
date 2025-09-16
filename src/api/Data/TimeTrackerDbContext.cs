@@ -64,7 +64,7 @@ public class TimeTrackerDbContext : DbContext
             entity.HasOne(t => t.User)
                   .WithMany(u => u.TimeEntries)
                   .HasForeignKey(t => t.UserId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .OnDelete(DeleteBehavior.NoAction);
                   
             entity.HasOne(t => t.Project)
                   .WithMany(p => p.TimeEntries)

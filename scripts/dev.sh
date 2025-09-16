@@ -100,7 +100,7 @@ setup_dev() {
 
 # Start services with Docker
 start_docker() {
-    print_info "Starting full environment with Docker Compose..."
+    print_status "Starting full environment with Docker Compose..."
     $DOCKER_COMPOSE_CMD up -d
     print_success "Services started! Check status with: $0 status"
 }
@@ -110,7 +110,7 @@ start_local() {
     print_status "Starting services locally..."
     
     # Start SQL Server with Docker (lightweight option)
-    print_info "Starting SQL Server..."
+    print_status "Starting SQL Server..."
     $DOCKER_COMPOSE_CMD up -d sqlserver
     
     # Wait for SQL Server to be ready

@@ -1,5 +1,4 @@
 # Production Docker Compose override
-version: '3.8'
 
 services:
   # Production API configuration
