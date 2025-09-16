@@ -144,7 +144,20 @@ start_local() {
 # Stop all services
 stop() {
     print_status "Stopping all services..."
-    $DOCKER_COMPOSE_CMD down
+    # Set Docker Compose command if not already set
+    if [ -z "$DOCKER_COMPOSE_CMD" ]; then
+        if command -v docker-compose &> /dev/null; then
+            DOCKER_COMPOSE_CMD="docker-compose"
+        elif docker compose version &> /dev/null; then
+            DOCKER_COMPOSE_CMD="docker compose"
+        fi
+    fi
+    
+    # Stop Docker services if command is available
+    if [ -n "$DOCKER_COMPOSE_CMD" ]; then
+        $DOCKER_COMPOSE_CMD down
+    fi
+    
     # Kill any local processes
     pkill -f "dotnet run" 2>/dev/null || true
     pkill -f "npm run dev" 2>/dev/null || true
