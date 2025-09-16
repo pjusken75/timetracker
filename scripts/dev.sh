@@ -5,6 +5,9 @@
 
 set -e
 
+# Global variables
+DOCKER_COMPOSE_CMD=""
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -47,8 +50,12 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Check Docker Compose
-    if ! command -v docker-compose &> /dev/null; then
+    # Check Docker Compose (support both old and new syntax)
+    if command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+    elif docker compose version &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker compose"
+    else
         print_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
@@ -93,8 +100,8 @@ setup_dev() {
 
 # Start services with Docker
 start_docker() {
-    print_status "Starting services with Docker..."
-    docker-compose up -d
+    print_info "Starting full environment with Docker Compose..."
+    $DOCKER_COMPOSE_CMD up -d
     print_success "Services started! Check status with: $0 status"
 }
 
@@ -103,8 +110,8 @@ start_local() {
     print_status "Starting services locally..."
     
     # Start SQL Server with Docker (lightweight option)
-    print_status "Starting SQL Server..."
-    docker-compose up -d sqlserver
+    print_info "Starting SQL Server..."
+    $DOCKER_COMPOSE_CMD up -d sqlserver
     
     # Wait for SQL Server to be ready
     print_status "Waiting for SQL Server to be ready..."
@@ -130,14 +137,14 @@ start_local() {
     echo "Press Ctrl+C to stop all services"
     
     # Wait for interrupt
-    trap "kill $API_PID $WEB_PID; docker-compose stop sqlserver; exit" INT
+    trap "kill $API_PID $WEB_PID; $DOCKER_COMPOSE_CMD stop sqlserver; exit" INT
     wait
 }
 
 # Stop all services
 stop() {
     print_status "Stopping all services..."
-    docker-compose down
+    $DOCKER_COMPOSE_CMD down
     # Kill any local processes
     pkill -f "dotnet run" 2>/dev/null || true
     pkill -f "npm run dev" 2>/dev/null || true
@@ -148,22 +155,22 @@ stop() {
 show_status() {
     print_status "Service Status:"
     echo ""
-    docker-compose ps
+    $DOCKER_COMPOSE_CMD ps
 }
 
 # Show logs
 show_logs() {
     if [ -z "$1" ]; then
-        docker-compose logs -f
+        $DOCKER_COMPOSE_CMD logs -f
     else
-        docker-compose logs -f "$1"
+        $DOCKER_COMPOSE_CMD logs -f "$1"
     fi
 }
 
 # Clean up Docker resources
 cleanup() {
     print_status "Cleaning up Docker resources..."
-    docker-compose down -v --remove-orphans
+    $DOCKER_COMPOSE_CMD down -v --remove-orphans
     docker system prune -f
     print_success "Cleanup completed"
 }
@@ -195,7 +202,7 @@ run_migrations() {
 # Build production images
 build_prod() {
     print_status "Building production images..."
-    docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
+    $DOCKER_COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml build
     print_success "Production images built"
 }
 

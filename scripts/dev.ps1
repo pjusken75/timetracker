@@ -9,6 +9,19 @@ param(
     [string]$Service = ""
 )
 
+# Global variables
+$script:DockerComposeCmd = ""
+
+# Helper function to run docker compose commands
+function Invoke-DockerCompose {
+    param([string[]]$Arguments)
+    if ($script:DockerComposeCmd -is [array]) {
+        & $script:DockerComposeCmd[0] $script:DockerComposeCmd[1] @Arguments
+    } else {
+        & $script:DockerComposeCmd @Arguments
+    }
+}
+
 # Function to write colored output
 function Write-Header() {
     Write-Host "================================" -ForegroundColor Magenta
@@ -43,8 +56,12 @@ function Test-Prerequisites() {
         exit 1
     }
     
-    # Check Docker Compose
-    if (-not (Get-Command docker-compose -ErrorAction SilentlyContinue)) {
+    # Check Docker Compose (support both old and new syntax)
+    if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
+        $script:DockerComposeCmd = "docker-compose"
+    } elseif ((docker compose version) -and ($LASTEXITCODE -eq 0)) {
+        $script:DockerComposeCmd = "docker", "compose"
+    } else {
         Write-Error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     }
@@ -93,8 +110,8 @@ function Initialize-DevEnvironment() {
 
 # Start services with Docker
 function Start-DockerServices() {
-    Write-Status "Starting services with Docker..."
-    docker-compose up -d
+    Write-Status "Starting full environment with Docker Compose..."
+    Invoke-DockerCompose @("up", "-d")
     Write-Success "Services started! Check status with: .\dev.ps1 status"
 }
 
@@ -104,7 +121,7 @@ function Start-LocalServices() {
     
     # Start SQL Server with Docker (lightweight option)
     Write-Status "Starting SQL Server..."
-    docker-compose up -d sqlserver
+    Invoke-DockerCompose @("up", "-d", "sqlserver")
     
     # Wait for SQL Server to be ready
     Write-Status "Waiting for SQL Server to be ready..."
@@ -143,14 +160,14 @@ function Start-LocalServices() {
         Write-Status "Stopping services..."
         Stop-Job $ApiJob, $WebJob -ErrorAction SilentlyContinue
         Remove-Job $ApiJob, $WebJob -ErrorAction SilentlyContinue
-        docker-compose stop sqlserver
+        Invoke-DockerCompose @("stop", "sqlserver")
     }
 }
 
 # Stop all services
 function Stop-AllServices() {
     Write-Status "Stopping all services..."
-    docker-compose down
+    Invoke-DockerCompose @("down")
     
     # Stop any running .NET or Node processes
     Get-Process | Where-Object { $_.ProcessName -like "*dotnet*" -or $_.ProcessName -like "*node*" } | 
@@ -164,22 +181,22 @@ function Stop-AllServices() {
 function Show-ServiceStatus() {
     Write-Status "Service Status:"
     Write-Host ""
-    docker-compose ps
+    Invoke-DockerCompose @("ps")
 }
 
 # Show logs
 function Show-ServiceLogs($ServiceName) {
     if ([string]::IsNullOrEmpty($ServiceName)) {
-        docker-compose logs -f
+        Invoke-DockerCompose @("logs", "-f")
     } else {
-        docker-compose logs -f $ServiceName
+        Invoke-DockerCompose @("logs", "-f", $ServiceName)
     }
 }
 
 # Clean up Docker resources
 function Clear-DockerResources() {
     Write-Status "Cleaning up Docker resources..."
-    docker-compose down -v --remove-orphans
+    Invoke-DockerCompose @("down", "-v", "--remove-orphans")
     docker system prune -f
     Write-Success "Cleanup completed"
 }
@@ -218,7 +235,7 @@ function Invoke-DatabaseMigrations() {
 # Build production images
 function Build-ProductionImages() {
     Write-Status "Building production images..."
-    docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
+    Invoke-DockerCompose @("-f", "docker-compose.yml", "-f", "docker-compose.prod.yml", "build")
     Write-Success "Production images built"
 }
 
