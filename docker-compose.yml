@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: timetracker-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=TimeTracker123!
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - timetracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P TimeTracker123! -Q 'SELECT 1'"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # .NET API
+  api:
+    build:
+      context: ./src/api
+      dockerfile: Dockerfile
+    container_name: timetracker-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=TimeTrackerDb;User Id=sa;Password=TimeTracker123!;TrustServerCertificate=true;
+      - AzureAdB2C__Instance=https://login.microsoftonline.com/
+      - AzureAdB2C__Domain=localhost
+      - AzureAdB2C__TenantId=common
+      - AzureAdB2C__ClientId=dev-client-id
+    ports:
+      - "5000:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./src/api:/app/src
+    networks:
+      - timetracker-network
+    restart: unless-stopped
+
+  # React Frontend (Development)
+  web:
+    build:
+      context: ./src/web
+      dockerfile: Dockerfile.dev
+    container_name: timetracker-web
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5000/api
+      - VITE_AZURE_CLIENT_ID=dev-client-id
+      - VITE_AZURE_TENANT_ID=common
+      - VITE_AZURE_POLICY_NAME=B2C_1_signupsignin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src/web:/app
+      - /app/node_modules
+    networks:
+      - timetracker-network
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # Redis (for caching - optional)
+  redis:
+    image: redis:7-alpine
+    container_name: timetracker-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - timetracker-network
+    restart: unless-stopped
+
+  # Nginx (for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: timetracker-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - web
+    networks:
+      - timetracker-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  sqlserver_data:
+  redis_data:
+
+networks:
+  timetracker-network:
+    driver: bridge

@@ -1,0 +1,29 @@
+# Production Docker Compose override
+version: '3.8'
+
+services:
+  # Production API configuration
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    restart: always
+
+  # Production Web configuration (build for production)
+  web:
+    build:
+      context: ./src/web
+      dockerfile: Dockerfile
+      target: production
+    restart: always
+
+  # Production Nginx configuration
+  nginx:
+    profiles: []  # Enable nginx in production
+    volumes:
+      - ./docker/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+
+  # Remove development-only services
+  redis:
+    profiles:
+      - development
