@@ -27,7 +27,12 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://localhost:3000")
+        policy.WithOrigins(
+                "http://localhost:3000", 
+                "https://localhost:3000",
+                "https://green-wave-0f6ddbf03.2.azurestaticapps.net",
+                "https://green-wave-0f6ddbf03-preview.westeurope.2.azurestaticapps.net"
+            )
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
